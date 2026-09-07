@@ -1,4 +1,4 @@
-;;; org-hugo-auto-export-mode.el --- Minor mode for auto-exporting using ox-hugo -*- lexical-binding: t -*-
+;;; org-astro-auto-export-mode.el --- Minor mode for auto-exporting using ox-hugo -*- lexical-binding: t -*-
 
 ;; Authors: Kaushal Modi <kaushal.mod@gmail.com>, Evgeni Kolev <evgenysw@gmail.com>
 ;; URL: https://ox-hugo.scripter.co
@@ -16,7 +16,7 @@
 ;; to the .dir-locals.el:
 ;;
 ;;   (("content-org/"
-;;     . ((org-mode . ((eval . (org-hugo-auto-export-mode)))))))
+;;     . ((org-mode . ((eval . (org-astro-auto-export-mode)))))))
 
 ;;; Code:
 
@@ -31,11 +31,11 @@ The exporting happens only when Org Capture is not in progress."
       (org-hugo-export-wim-to-md))))
 
 ;;;###autoload
-(define-minor-mode org-hugo-auto-export-mode
+(define-minor-mode org-astro-auto-export-mode
   "Toggle auto exporting the Org file using `ox-hugo'."
   :global nil
   :lighter ""
-  (if org-hugo-auto-export-mode
+  (if org-astro-auto-export-mode
       ;; When the mode is enabled
       (progn
         (add-hook 'after-save-hook #'org-hugo-export-wim-to-md-after-save :append :local))
@@ -43,6 +43,6 @@ The exporting happens only when Org Capture is not in progress."
     (remove-hook 'after-save-hook #'org-hugo-export-wim-to-md-after-save :local)))
 
 
-(provide 'org-hugo-auto-export-mode)
+(provide 'org-astro-auto-export-mode)
 
-;;; org-hugo-auto-export-mode.el ends here
+;;; org-astro-auto-export-mode.el ends here
