@@ -24,5 +24,6 @@
 
 ;; (require 't1-astro)
 (require 'tanchor-astro)
+(require 'tfm-astro)
 (require 'tslug-astro)
 (require 'telement-astro)

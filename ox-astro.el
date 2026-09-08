@@ -288,13 +288,14 @@ directory where all Hugo posts should go by default."
   :type 'directory)
 ;;;###autoload (put 'org-astro-section 'safe-local-variable 'stringp)
 
-(defcustom org-astro-front-matter-format "toml"
-  "Front-matter format.
-This variable can be set to either \"toml\" or \"yaml\"."
+(defcustom org-astro-front-matter-format "yaml"
+  "Front-matter format used in the exported Astro Markdown.
+This variable can be set to either \"yaml\" (default; Astro's
+preferred format) or \"toml\"."
   :group 'org-export-astro
   :type '(choice
-          (const :tag "TOML" "toml")
-          (const :tag "YAML" "yaml")))
+          (const :tag "YAML" "yaml")
+          (const :tag "TOML" "toml")))
 ;;;###autoload (put 'org-astro-front-matter-format 'safe-local-variable 'stringp)
 
 (defcustom org-astro-footer ""
@@ -4205,10 +4206,10 @@ Return nil if STR is an empty string, or not a string."
     unquoted-str))
 
 (defun org-astro--get-front-matter (info)
-  "Return the Hugo front-matter string.
+  "Return the Astro front-matter string.
 
 INFO is a plist used as a communication channel."
-  ;; (message "[hugo front-matter DBG] info: %S" (pp info))
+  ;; (message "[astro front-matter DBG] info: %S" (pp info))
   (let* ((fm-format (plist-get info :astro-front-matter-format))
          (author-list (and (plist-get info :with-author)
                            (let ((author-raw
@@ -4234,27 +4235,12 @@ INFO is a plist used as a communication channel."
          (locale (and (plist-get info :astro-with-locale)
                       (org-astro--get-lang info)))
          (description (org-string-nw-p (plist-get info :description)))
-         (aliases-raw (let ((aliases-raw-1 (org-string-nw-p (plist-get info :astro-aliases))))
-                        (when aliases-raw-1
-                          (org-split-string aliases-raw-1 " "))))
-         (aliases (let (alias-list)
-                    (dolist (alias aliases-raw)
-                      (unless (string-match-p "/" alias)
-                        (let ((section (file-name-as-directory ;Suffix section with "/" if it isn't already
-                                        (org-export-data (plist-get info :astro-section) info))))
-                          (setq alias (concat "/" section alias))))
-                      (setq alias-list (append alias-list `(,alias))))
-                    alias-list))
-         (outputs-raw (org-string-nw-p (plist-get info :astro-outputs)))
-         (outputs (when outputs-raw
-                    (org-split-string outputs-raw " ")))
+         ;; The draft state is emitted as a real YAML/TOML boolean.
          (draft (org-astro--parse-draft-state info))
-         (headless (when (org-astro--plist-get-true-p info :astro-headless)
-                     (org-astro--front-matter-value-booleanize (org-astro--plist-get-true-p info :astro-headless))))
          (all-t-and-c-str (org-entry-get (point) "ALLTAGS")) ;Includes tags inherited from #+filetags: too.
          (all-t-and-c (or (when (stringp all-t-and-c-str)    ;tags/categories from `all-t-and-c' are used
                             (org-split-string all-t-and-c-str ":")) ;only if ASTRO_TAGS or ASTRO_CATEGORIES are not set.
-                          (and (null (org-astro--subtree-export-p info)) ;Use #+filetags: for file-based exports if #+hugo_tags are not set.
+                          (and (null (org-astro--subtree-export-p info)) ;Use #+filetags: for file-based exports if #+astro_tags are not set.
                                org-file-tags)))
          (tags (or
                 ;; Look for tags set using ASTRO_TAGS keyword, or
@@ -4285,85 +4271,33 @@ INFO is a plist used as a communication channel."
                         ;; (message "dbg: categories: categories-list = %s" categories-list)
                         categories-list)))
          (keywords (org-astro--delim-str-to-list (plist-get info :keywords)))
-         (weight-data (let ((wt-raw-list (org-astro--parse-property-arguments (plist-get info :astro-weight)))
-                            weight-data-1)
-                        (dolist (wt-raw wt-raw-list)
-                          (let (key value)
-                            ;; (message "weight DBG wt-raw: %S" wt-raw)
-                            ;; (message "weight DBG cdr wt-raw: %S" (cdr wt-raw))
-                            ;; (message "weight DBG org-astro--subtree-coord: %S" org-astro--subtree-coord)
-                            (cond
-                             ((null (cdr wt-raw)) ;`wt-raw' is not of the type (TAXONOMY . WEIGHT)
-                              (setq key 'weight)
-                              (setq value (cond
-                                           ((and org-astro--subtree-coord
-                                                 (equal (car wt-raw) 'auto)) ;(auto)
-                                            (org-astro--calc-weight))
-                                           ((and (equal (car wt-raw) 'auto) ;Auto weight ineffective for file-based exports
-                                                 (null org-astro--subtree-coord))
-                                            nil)
-                                           (t
-                                            (string-to-number (symbol-name (car wt-raw)))))))
-                             (t
-                              (setq key (if (equal (car wt-raw) 'page) ;`wt-raw' is of the type (page . WEIGHT)
-                                            'weight
-                                          (intern (format "%s_weight" (symbol-name (car wt-raw))))))
-                              (setq value (cond
-                                           ((and org-astro--subtree-coord
-                                                 (equal (cdr wt-raw) "auto")) ;(TAXONOMY . "auto") or (page . "auto")
-                                            (org-astro--calc-weight))
-                                           ((numberp (cdr wt-raw))
-                                            (cdr wt-raw))
-                                           ((and (equal (cdr wt-raw) "auto") ;Auto weight ineffective for file-based exports
-                                                 (null org-astro--subtree-coord))
-                                            nil)
-                                           (t
-                                            (user-error "Ox-astro: Invalid weight %S" (cdr wt-raw)))))))
-                            ;; (message "weight DBG key: %S" key)
-                            ;; (message "weight DBG value: %S" value)
-                            (push (cons key value) weight-data-1)))
-                        ;; (message "weight DBG weight-data: %S" weight-data-1)
-                        weight-data-1))
-         (menu-alist nil)
          (custom-fm-data (org-astro--parse-property-arguments (plist-get info :astro-custom-front-matter)))
-         (resources (org-astro--get-resources-alist
-                     (org-astro--parse-property-arguments (plist-get info :astro-resources))))
-         (blackfriday nil)
          (data `(;; The order of the elements below will be the order in which the front-matter
                  ;; variables will be ordered.
+                 ;;
+                 ;; Keys follow Astro's content collection schema
+                 ;; (https://docs.astro.build/en/reference/content-config-reference/):
+                 ;; title, description, pubDate, updatedDate, draft, tags,
+                 ;; categories, keywords, slug, image.  Hugo-only keys
+                 ;; (menu, weight, headless, outputs, publishDate,
+                 ;; expiryDate, isCJKLanguage, blackfriday, ...) are not
+                 ;; supported by this backend; users can still inject
+                 ;; arbitrary keys via ASTRO_CUSTOM_FRONT_MATTER.
                  (title . ,(org-astro--get-sanitized-title info))
-                 (audio . ,(org-astro--string-unquote (plist-get info :astro-audio)))
-                 (author . ,author-list)
                  (description . ,description)
-                 (date . ,(org-astro--format-date :date info))
-                 (publishDate . ,(org-astro--format-date :astro-publishdate info))
-                 (expiryDate . ,(org-astro--format-date :astro-expirydate info))
-                 (aliases . ,aliases)
-                 (images . ,(org-astro--delim-str-to-list (plist-get info :astro-images)))
-                 (isCJKLanguage . ,(org-astro--plist-get-true-p info :astro-iscjklanguage))
+                 (pubDate . ,(org-astro--format-date :date info))
+                 (updatedDate . ,(org-astro--format-date :astro-lastmod info))
+                 (author . ,author-list)
                  (keywords . ,keywords)
-                 (layout . ,(plist-get info :astro-layout))
-                 (lastmod . ,(org-astro--format-date :astro-lastmod info))
-                 (linkTitle . ,(plist-get info :astro-linktitle))
-                 (markup . ,(plist-get info :astro-markup))
-                 (outputs . ,outputs)
-                 (series . ,(org-astro--delim-str-to-list (plist-get info :astro-series)))
-                 (slug . ,(plist-get info :astro-slug))
-                 (tags . ,tags)
                  (categories . ,categories)
-                 (type . ,(plist-get info :astro-type))
-                 (url . ,(plist-get info :astro-url))
-                 (videos . ,(org-astro--delim-str-to-list (plist-get info :astro-videos)))
-                 (draft . ,draft)
-                 (headless . ,headless)
+                 (tags . ,tags)
+                 (slug . ,(plist-get info :astro-slug))
+                 ;; `org-astro--parse-draft-state' returns a "true"/
+                 ;; "false" string; emit a real YAML/TOML boolean.
+                 (draft . ,(string= "true" draft))
                  (creator . ,creator)
-                 (locale . ,locale)
-                 (blackfriday . ,blackfriday)))
-         (data `,(append data weight-data custom-fm-data
-                         (list
-                          (cons 'menu menu-alist)
-                          (cons 'resources resources)
-                          (cons 'logbook (plist-get info :logbook)))))
+                 (locale . ,locale)))
+         (data `,(append data custom-fm-data))
          ret)
 
     ;; (message "[get fm DBG] tags: %s" tags)
@@ -4446,17 +4380,78 @@ LEVEL."
     (+ (* 1000 level) index)))
 
 (defun org-astro--gen-front-matter (data format)
-  "Generate the Hugo post front-matter, and return that string.
+  "Generate the Astro post front-matter, and return that string.
 
-DATA is an alist of the form \((KEY1 . VAL1) (KEY2 . VAL2) .. \),
-where KEY is a symbol and VAL is a string.
+DATA is an alist of the form ((KEY1 . VAL1) (KEY2 . VAL2) ..),
+where KEY is a symbol and VAL is a string, a list, or an alist.
 
 Generate the front-matter in the specified FORMAT.  Valid values
-are \"toml\" and \"yaml\"."
+are \"toml\" (via `tomelr') and \"yaml\" (default)."
   (if (string= format "yaml")
       (org-astro--gen-yaml-front-matter data)
     (let ((tomelr-indent-multi-line-strings t))
       (format "+++\n%s\n+++\n" (tomelr-encode data)))))
+
+(defun org-astro--yaml-scalar (value)
+  "Return VALUE encoded as a YAML scalar string.
+
+Booleans become \"true\"/\"false\", numbers pass through, nil
+becomes \"null\".  Strings are always double-quoted (with `\\' and
+`\"' escaped) so that values containing YAML special characters
+like `:' or `#' cannot corrupt the front matter.  Astro's
+zod-based schemas coerce the quoted ISO date strings to dates."
+  (cond
+   ((null value) "null")
+   ((eq value t) "true")
+   ((numberp value) (number-to-string value))
+   ((listp value) ;e.g. alist stored by custom front matter
+    (user-error "Nested value %S not supported here" value))
+   (t ;string
+    (concat "\""
+            (replace-regexp-in-string
+             "\"" "\\\\\""
+             (replace-regexp-in-string "\\\\" "\\\\\\\\" value))
+            "\""))))
+
+(defun org-astro--gen-yaml-front-matter (data)
+  "Generate Astro front-matter in YAML format, and return that string.
+
+DATA is an alist of the form ((KEY1 . VAL1) (KEY2 . VAL2) ..),
+where KEY is a symbol and VAL is a string, list, or alist.
+Keys with nil or empty values are skipped."
+  (let ((out ""))
+    (dolist (pair data)
+      (let* ((key (symbol-name (car pair)))
+             (value (cdr pair)))
+        (unless (or (null value)
+                    (and (stringp value) (string= "" value)))
+          (cond
+           ;; Nested alist -> YAML mapping with 2-space indented keys.
+           ((and (listp value) (consp (car value)))
+            (setq out (concat out key ":\n"))
+            (dolist (nested-pair value)
+              (let ((nested-key (symbol-name (car nested-pair)))
+                    (nested-value (cdr nested-pair)))
+                (unless (or (null nested-value)
+                            (and (stringp nested-value) (string= "" nested-value)))
+                  (setq out (concat out
+                                    (format "  %s: %s\n"
+                                            nested-key
+                                            (org-astro--yaml-scalar nested-value))))))))
+           ;; Lisp list of scalars -> YAML flow sequence.
+           ((listp value)
+            (setq out (concat out
+                              (format "%s: [%s]\n" key
+                                      (mapconcat #'org-astro--yaml-scalar value ", ")))))
+           ;; Plain scalar.
+           (t
+            (setq out (concat out
+                              (format "%s: %s\n" key
+                                      (org-astro--yaml-scalar value)))))))))
+    ;; Strip trailing newline; caller re-adds the closing fence.
+    (if (string= out "")
+        "---\n\n---\n" ;Empty front matter still needs valid fences
+      (concat "---\n" (substring out 0 -1) "\n---\n"))))
 
 (defun org-astro--selective-property-inheritance ()
   "Return a list of properties that should be inherited."

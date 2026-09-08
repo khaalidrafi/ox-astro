@@ -110,7 +110,7 @@ Emacs installation.  If Emacs is installed using
 (when ox-astro-test-setup-verbose
   (message "ox-astro-tmp-dir: %s" ox-astro-tmp-dir))
 
-(defvar ox-astro-packages '(toc-org citeproc org-ref tomelr))
+(defvar ox-astro-packages '(toc-org citeproc org-ref tomelr yaml))
 (when ox-astro-install-org-from-elpa
   ;; Fri Sep 22 18:24:19 EDT 2017 - kmodi
   ;; Install the packages in the specified order. We do not want
@@ -190,7 +190,9 @@ to be installed.")
   (error "The environment variable OX_HUGO_TMP_DIR needs to be set"))
 
 (require 'oc-csl nil :noerror)          ;Auto-register csl processor
-(require 'org-ref)
+;; org-ref is needed only for the citation-related golden tests; do not
+;; hard-fail the whole test suite when it is missing (e.g. offline).
+(require 'org-ref nil :noerror)
 
 (require 'ox-astro)
 (defun org-astro-export-all-wim-to-md ()

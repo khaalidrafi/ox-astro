@@ -54,9 +54,13 @@ variable, and communication channel under `info'."
   `(org-test-with-temp-text ,data
      (org-export--delete-comment-trees)
      (let* ((tree (org-element-parse-buffer))
+            ;; Org 9.8+ export filter machinery expects `:back-end'
+            ;; in INFO to be a backend *object* (like `org-export-as'
+            ;; stores it), not a symbol.  Resolve it up front.
+            (backend (org-export-get-backend 'astro))
             (info (org-combine-plists
-                   (org-export--get-export-attributes 'astro)
-                   (org-export-get-environment 'astro))))
+                   (org-export--get-export-attributes backend)
+                   (org-export-get-environment backend))))
        (org-export--prune-tree tree info)
        (org-export--remove-uninterpreted-data tree info)
        (let ((info (org-combine-plists
