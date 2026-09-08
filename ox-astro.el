@@ -2493,8 +2493,91 @@ Else, no HTML element is wrapped around the HEADING."
                (plist-get info :html-container)
              "div"))))
 
+;;;; GitHub slugger
+;; Elisp port of the `github-slugger' npm package (ISC license,
+;; https://github.com/Flet/github-slugger), which Astro uses to derive
+;; content collection entry ids and Markdown heading anchors.  Keeping
+;; the exact algorithm matters: slugs generated here must match the
+;; ones Astro generates on its side so that `#anchors' in exported
+;; links resolve on the built site.
+
+(defconst org-astro--slug-keep-re "[[:alpha:][:digit:]]\\|_\\|-"
+  "Regexp matching characters KEPT in slugs by github-slugger.
+Characters not matching this are removed.  Emacs's `[:alpha:]'
+and `[:digit:]' are Unicode-aware and cover non-ASCII letters
+(Cyrillic, Han, ...) and combining marks as well; `_` and `-` are
+kept verbatim, mirroring the generated removal regex in
+github-slugger's regex.js (which excludes exactly 0x2D and 0x5F
+from ASCII punctuation).")
+
+(defvar org-astro--slug-occurrences nil
+  "Hash table mapping base slug -> occurrence count.
+Shared state for `org-astro-slug' deduplication, mirroring the
+`occurrences' field of the GitHub slugger class.")
+
+(defun org-astro--slug-reset ()
+  "Forget all previously generated slugs.
+Equivalent to calling `reset()' on a GitHub slugger instance."
+  (setq org-astro--slug-occurrences (make-hash-table :test #'equal)))
+
+;; Initialize the shared state at load time.
+(org-astro--slug-reset)
+
+(defun org-astro--slugify (value &optional maintain-case)
+  "Return the stateless slug for string VALUE.
+
+This is the `slug()' helper from github-slugger: lowercase VALUE
+(unless MAINTAIN-CASE), remove characters that GitHub's slug
+algorithm removes (keeping letters incl. non-ASCII, numbers,
+`_`, `-` and other connector punctuation), and turn every space
+into a hyphen.  No deduplication happens here."
+  (let ((str (if (stringp value)
+                 (if maintain-case value (downcase value))
+               "")))
+    ;; Rebuild string char by char:
+    ;; - spaces become hyphens
+    ;; - kept chars pass through
+    ;; - everything else is removed
+    ;; This mirrors value.replace(regex, '').replace(/ /g, '-')
+    ;; in github-slugger's `slug()'.
+    (mapconcat
+     (lambda (ch)
+       (cond
+        ((= ch ?\s) "-")
+        ((string-match-p org-astro--slug-keep-re (char-to-string ch))
+         (char-to-string ch))
+        ;; `[:digit:]' is ASCII-only in Emacs, but github-slugger keeps
+        ;; all Unicode decimal digits (category Nd), e.g. Arabic-Indic.
+        ((eq (get-char-code-property ch 'general-category) 'Nd)
+         (char-to-string ch))
+        (t "")))
+     (string-to-list str)
+     "")))
+
+(defun org-astro-slug (value &optional _maintain-case)
+  "Return a slug unique across this process, like GitHub does.
+
+VALUE is the string to slugify.  Repeated calls with the same
+base value append `-1', `-2', ... suffixes, and the counter also
+advances when a generated slug (like `foo-1') collides with a
+later input, exactly like github-slugger's `slug()' method.
+
+The deduplication state is shared per-process; use
+`org-astro--slug-reset' between exports if strict isolation is
+needed."
+  (let* ((base (org-astro--slugify value))
+         (result base))
+    (when (gethash base org-astro--slug-occurrences)
+      (let ((n (1+ (gethash base org-astro--slug-occurrences))))
+        (while (gethash result org-astro--slug-occurrences)
+          (setq result (format "%s-%d" base n)
+                n (1+ n)))
+        (puthash base (1- n) org-astro--slug-occurrences)))
+    (puthash result 0 org-astro--slug-occurrences)
+    result))
+
 ;;;###autoload
-(defun org-astro-slug (str &optional allow-double-hyphens)
+(defun org-astro--hugo-slug (str &optional allow-double-hyphens)
   "Convert string STR to a `slug' and return that string.
 
 A `slug' is the part of a URL which identifies a particular page
@@ -2608,7 +2691,7 @@ INFO is a plist used as a communication channel.
 Return nil if ELEMENT's `:title' property is nil or an empty string."
   (let ((title (org-export-data-with-backend
                 (org-element-property :title element) 'md info)))
-    (org-string-nw-p (org-astro-slug title :allow-double-hyphens))))
+    (org-string-nw-p (org-astro--hugo-slug title :allow-double-hyphens))))
 
 (defun org-astro-get-md5 (element info)
   "Return md5 sum derived string using ELEMENT's title property.
@@ -3934,7 +4017,7 @@ INFO is a plist used as a communication channel."
                 (push cell menu-params))))
           ;; Auto-set menu identifier if not already set by user.
           (unless (assoc 'identifier menu-params)
-            (let ((id (org-astro-slug (org-astro--get-sanitized-title info))))
+            (let ((id (org-astro--hugo-slug (org-astro--get-sanitized-title info))))
               (push `(identifier . ,id) menu-params)))
           ;; Auto-set menu weight if not already set by user.
           (unless (assoc 'weight menu-params)
