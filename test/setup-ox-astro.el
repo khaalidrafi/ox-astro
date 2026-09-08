@@ -1,5 +1,5 @@
 ;; Setup to export Org files to Hugo-compatible Markdown using
-;; `ox-hugo' in an "emacs -Q" environment.
+;; `ox-astro' in an "emacs -Q" environment.
 
 ;; Some sane settings
 (setq-default require-final-newline t)
@@ -10,10 +10,10 @@
 (setq debug-ignored-errors (remq 'user-error debug-ignored-errors))
 (toggle-debug-on-error)
 
-(defvar ox-hugo-test-setup-verbose nil
-  "When non-nil, enable printing more messages from setup-ox-hugo.el.")
+(defvar ox-astro-test-setup-verbose nil
+  "When non-nil, enable printing more messages from setup-ox-astro.el.")
 
-(defvar ox-hugo-install-org-from-elpa (or (null (getenv "OX_HUGO_DEFAULT_ORG"))
+(defvar ox-astro-install-org-from-elpa (or (null (getenv "OX_HUGO_DEFAULT_ORG"))
                                           (version< emacs-version "26.0"))
   "When non-nil, install Org from Org Elpa.
 
@@ -23,14 +23,14 @@ unset, else it is nil.
 
 Emacs 26 onwards comes with at least Org 9.1.4.  So there is no
 need to install Org from Elpa as that Org version meets the
-minimum requirement for `ox-hugo'.  So set the environment
+minimum requirement for `ox-astro'.  So set the environment
 variable OX_HUGO_DEFAULT_ORG to a value like 1 if using emacs 26
 or newer.")
 
-(defvar ox-hugo-default-share-directory nil
+(defvar ox-astro-default-share-directory nil
   "Share directory for this Emacs installation.")
 
-(defvar ox-hugo-default-lisp-directory nil
+(defvar ox-astro-default-lisp-directory nil
   "Directory containing lisp files for the Emacs installation.
 
 This value must match the path to the lisp/ directory of the
@@ -40,7 +40,7 @@ Emacs installation.  If Emacs is installed using
 
 ;; Remove Org that ships with Emacs from the `load-path' if installing
 ;; it from Elpa.
-(when ox-hugo-install-org-from-elpa
+(when ox-astro-install-org-from-elpa
   (let* ((bin-dir (when (and invocation-directory
                              (file-exists-p invocation-directory))
                     (file-truename invocation-directory)))
@@ -49,7 +49,7 @@ Emacs installation.  If Emacs is installed using
          (share-dir (when prefix-dir
                       (let ((share-dir-1 (file-name-as-directory (expand-file-name "share" prefix-dir))))
                         (when (file-exists-p share-dir-1)
-                          (setq ox-hugo-default-share-directory share-dir-1))
+                          (setq ox-astro-default-share-directory share-dir-1))
                         share-dir-1)))
          (version-dir (when share-dir
                         (let* ((emacs-dir (file-name-as-directory (expand-file-name "emacs" share-dir)))
@@ -71,18 +71,18 @@ Emacs installation.  If Emacs is installed using
     (when version-dir
       (let ((lisp-dir-1 (file-name-as-directory (expand-file-name "lisp" version-dir))))
         (when (file-exists-p lisp-dir-1)
-          (setq ox-hugo-default-lisp-directory lisp-dir-1)))))
-  (when ox-hugo-test-setup-verbose
-    (message "ox-hugo-default-share-directory: %s" ox-hugo-default-share-directory)
-    (message "ox-hugo-default-lisp-directory: %s" ox-hugo-default-lisp-directory))
+          (setq ox-astro-default-lisp-directory lisp-dir-1)))))
+  (when ox-astro-test-setup-verbose
+    (message "ox-astro-default-share-directory: %s" ox-astro-default-share-directory)
+    (message "ox-astro-default-lisp-directory: %s" ox-astro-default-lisp-directory))
 
   (with-eval-after-load 'package
     ;; Remove Org that ships with Emacs from the `load-path'.
-    (let ((default-org-path (expand-file-name "org" ox-hugo-default-lisp-directory)))
+    (let ((default-org-path (expand-file-name "org" ox-astro-default-lisp-directory)))
       (setq load-path (delete default-org-path load-path)))
 
     ;; Remove Org installed in `site-lisp' directory from the `load-path'.
-    (let ((site-lisp-org-path (expand-file-name "emacs/site-lisp/org" ox-hugo-default-share-directory)))
+    (let ((site-lisp-org-path (expand-file-name "emacs/site-lisp/org" ox-astro-default-share-directory)))
       (setq load-path (delete site-lisp-org-path load-path)))
 
     ;; Remove Org from `package--builtin-versions'.
@@ -91,52 +91,52 @@ Emacs installation.  If Emacs is installed using
     (require 'finder-inf nil t)         ;Populate `package--builtins'
     (setq package--builtins (delete (assoc 'org package--builtins) package--builtins))
 
-    (when ox-hugo-test-setup-verbose
+    (when ox-astro-test-setup-verbose
       (message "org detected as installed initially? %S" (package-installed-p 'org))
       (message "load-path: %s" load-path)
       ;; (message "`load-path' Shadows:")
       ;; (message (list-load-path-shadows :stringp))
       )))
 
-(defvar ox-hugo-tmp-dir (let ((dir (file-name-as-directory
+(defvar ox-astro-tmp-dir (let ((dir (file-name-as-directory
                                     (or (getenv "OX_HUGO_TMP_DIR")
                                         (expand-file-name
-                                         "ox-hugo-dev"
+                                         "ox-astro-dev"
                                          (file-name-as-directory
                                           (expand-file-name
                                            user-login-name temporary-file-directory)))))))
                           (make-directory dir :parents)
                           dir))
-(when ox-hugo-test-setup-verbose
-  (message "ox-hugo-tmp-dir: %s" ox-hugo-tmp-dir))
+(when ox-astro-test-setup-verbose
+  (message "ox-astro-tmp-dir: %s" ox-astro-tmp-dir))
 
-(defvar ox-hugo-packages '(toc-org citeproc org-ref tomelr))
-(when ox-hugo-install-org-from-elpa
+(defvar ox-astro-packages '(toc-org citeproc org-ref tomelr))
+(when ox-astro-install-org-from-elpa
   ;; Fri Sep 22 18:24:19 EDT 2017 - kmodi
   ;; Install the packages in the specified order. We do not want
   ;; `toc-org' to be installed first. If that happens, `org' will be
   ;; required before the newer version of Org gets installed and we
   ;; will end up with mixed Org version.  So put `org' at the
-  ;; beginning of `ox-hugo-packages'.
-  (add-to-list 'ox-hugo-packages 'org))
+  ;; beginning of `ox-astro-packages'.
+  (add-to-list 'ox-astro-packages 'org))
 
-(defvar ox-hugo-site-git-root (progn
+(defvar ox-astro-site-git-root (progn
                                 (require 'vc-git)
                                 (file-truename (vc-git-root default-directory)))
   "Absolute path of the git root of the current project.")
-(when ox-hugo-test-setup-verbose
-  (message "ox-hugo-site-git-root: %S" ox-hugo-site-git-root))
+(when ox-astro-test-setup-verbose
+  (message "ox-astro-site-git-root: %S" ox-astro-site-git-root))
 
-(defvar ox-hugo-autoloads-file (expand-file-name "ox-hugo-autoloads.el" ox-hugo-site-git-root)
-  "Path to ox-hugo package's generated autoloads file.")
+(defvar ox-astro-autoloads-file (expand-file-name "ox-astro-autoloads.el" ox-astro-site-git-root)
+  "Path to ox-astro package's generated autoloads file.")
 
-(if (and (stringp ox-hugo-tmp-dir)
-         (file-exists-p ox-hugo-tmp-dir))
+(if (and (stringp ox-astro-tmp-dir)
+         (file-exists-p ox-astro-tmp-dir))
     (progn
       ;; Load newer version of .el and .elc if both are available
       (setq load-prefer-newer t)
 
-      (setq package-user-dir (format "%selpa_%s/" ox-hugo-tmp-dir emacs-major-version))
+      (setq package-user-dir (format "%selpa_%s/" ox-astro-tmp-dir emacs-major-version))
 
       ;; Below require will auto-create `package-user-dir' it doesn't exist.
       (require 'package)
@@ -154,12 +154,12 @@ Emacs installation.  If Emacs is installed using
       ;; Delete element with "nongnu" car from `package-archives'.
       (setq package-archives (delq (assoc "nongnu" package-archives) package-archives))
 
-      ;; Generate/update and load the autoloads for ox-hugo.el and co.
+      ;; Generate/update and load the autoloads for ox-astro.el and co.
       (if (fboundp #'loaddefs-generate) ;Emacs 29+
-          (loaddefs-generate ox-hugo-site-git-root ox-hugo-autoloads-file)
-        (let ((generated-autoload-file ox-hugo-autoloads-file)) ;Emacs 28.x and older
-          (update-directory-autoloads ox-hugo-site-git-root)))
-      (load-file ox-hugo-autoloads-file)
+          (loaddefs-generate ox-astro-site-git-root ox-astro-autoloads-file)
+        (let ((generated-autoload-file ox-astro-autoloads-file)) ;Emacs 28.x and older
+          (update-directory-autoloads ox-astro-site-git-root)))
+      (load-file ox-astro-autoloads-file)
 
       ;; Load emacs packages and activate them.
       ;; Don't delete this line.
@@ -167,40 +167,40 @@ Emacs installation.  If Emacs is installed using
       ;; `package-initialize' call is required before any of the below
       ;; can happen.
 
-      (add-to-list 'load-path (concat ox-hugo-site-git-root "doc/")) ;For ox-hugo-export-gh-doc.el
-      (add-to-list 'load-path ox-hugo-site-git-root) ;For ox-hugo.el, ox-blackfriday.el, etc.
+      (add-to-list 'load-path (concat ox-astro-site-git-root "doc/")) ;For ox-astro-export-gh-doc.el
+      (add-to-list 'load-path ox-astro-site-git-root) ;For ox-astro.el, ox-blackfriday.el, etc.
 
-      (defvar ox-hugo-missing-packages '()
+      (defvar ox-astro-missing-packages '()
         "List populated at each startup that contains the list of packages that need
 to be installed.")
 
-      (dolist (p ox-hugo-packages)
+      (dolist (p ox-astro-packages)
         ;; (message "Is %S installed? %s" p (package-installed-p p))
         (unless (package-installed-p p)
-          (add-to-list 'ox-hugo-missing-packages p :append)))
+          (add-to-list 'ox-astro-missing-packages p :append)))
 
-      (when ox-hugo-missing-packages
+      (when ox-astro-missing-packages
         (message "Emacs is now refreshing its package database...")
         (package-refresh-contents)
         ;; Install the missing packages
-        (dolist (p ox-hugo-missing-packages)
+        (dolist (p ox-astro-missing-packages)
           (message "Installing `%s' .." p)
           (package-install p))
-        (setq ox-hugo-missing-packages '())))
+        (setq ox-astro-missing-packages '())))
   (error "The environment variable OX_HUGO_TMP_DIR needs to be set"))
 
 (require 'oc-csl nil :noerror)          ;Auto-register csl processor
 (require 'org-ref)
 
-(require 'ox-hugo)
-(defun org-hugo-export-all-wim-to-md ()
-  (org-hugo-export-wim-to-md :all-subtrees nil nil :noerror))
+(require 'ox-astro)
+(defun org-astro-export-all-wim-to-md ()
+  (org-astro-export-wim-to-md :all-subtrees nil nil :noerror))
 
-(require 'ox-hugo-export-gh-doc)        ;For `ox-hugo-export-gh-doc'
+(require 'ox-astro-export-gh-doc)        ;For `ox-astro-export-gh-doc'
 
 ;; Allow setting few vars in Local Variables in the test files.
-(put 'org-hugo-auto-set-lastmod 'safe-local-variable 'booleanp)
-(put 'org-hugo-suppress-lastmod-period 'safe-local-variable 'floatp)
+(put 'org-astro-auto-set-lastmod 'safe-local-variable 'booleanp)
+(put 'org-astro-suppress-lastmod-period 'safe-local-variable 'floatp)
 (put 'org-cite-csl-styles-dir 'safe-local-variable 'stringp)
 
 (with-eval-after-load 'org
@@ -221,15 +221,15 @@ to be installed.")
     (org-babel-do-load-languages 'org-babel-load-languages ob-lang-alist))
 
   (with-eval-after-load 'ob-core
-    (defun ox-hugo-org-confirm-babel-evaluate-fn (lang body)
-      "Mark `org' as a safe language for ox-hugo tests and docs."
+    (defun ox-astro-org-confirm-babel-evaluate-fn (lang body)
+      "Mark `org' as a safe language for ox-astro tests and docs."
       (let* ((ob-enabled-langs '("org"))
              (ob-enabled-langs-re (regexp-opt ob-enabled-langs 'words))
              (unsafe t)) ;Set the return value `unsafe' to t by default
         (when (string-match-p ob-enabled-langs-re lang)
           (setq unsafe nil))
         unsafe))
-    (setq org-confirm-babel-evaluate #'ox-hugo-org-confirm-babel-evaluate-fn))
+    (setq org-confirm-babel-evaluate #'ox-astro-org-confirm-babel-evaluate-fn))
 
   (with-eval-after-load 'ox
     (setq org-export-headline-levels 4))) ;default is 3
@@ -262,25 +262,25 @@ to be installed.")
   ;; Set all local variables from .dir-locals.el, etc.
   (setq enable-local-variables :all)
 
-  ;; Override the default `org-hugo-export-creator-string' so that this
-  ;; string is consistent in all ox-hugo tests.
-  (setq org-hugo-export-creator-string "Emacs + Org mode + ox-hugo")
+  ;; Override the default `org-astro-export-creator-string' so that this
+  ;; string is consistent in all ox-astro tests.
+  (setq org-astro-export-creator-string "Emacs + Org mode + ox-astro")
 
   ;; Override the inbuilt `current-time' function so that the "lastmod"
   ;; tests work.
-  (defun ox-hugo-test/current-time-override (&rest args)
+  (defun ox-astro-test/current-time-override (&rest args)
     "Hard-code the 'current time' so that the lastmod tests are reproducible.
 
-`ox-hugo' uses `org-current-time' to determine the \"lastmod\" value.
+`ox-astro' uses `org-current-time' to determine the \"lastmod\" value.
 
 Fake current time: 2100/12/21 00:00:00 (arbitrary)."
     (encode-time 0 0 0 21 12 2100))
-  (advice-add 'org-current-time :override #'ox-hugo-test/current-time-override)
-  ;; (advice-remove 'org-current-time #'ox-hugo-test/current-time-override)
+  (advice-add 'org-current-time :override #'ox-astro-test/current-time-override)
+  ;; (advice-remove 'org-current-time #'ox-astro-test/current-time-override)
 
   ;; issue # 272
   (load (expand-file-name "test/issue-272-chkbox-items-to-front-matter.el"
-                          ox-hugo-site-git-root)
+                          ox-astro-site-git-root)
         nil :nomessage :nosuffix)
 
   (with-eval-after-load 'ox

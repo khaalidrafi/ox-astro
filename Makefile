@@ -1,15 +1,14 @@
-# Makefile to export org documents to md for Hugo from the command
-# line.
+# Makefile to run ox-astro tests from the command line.
 #
-# Run "make" to see the help for this Makefile.
+# Run "make" to see the help.
 
 MAKE_ := $(MAKE) -j1 --no-print-directory
 
 CURL ?= curl -fsSkL --retry 9 --retry-delay 9
 
 USER ?= me
-OX_HUGO_TMP_DIR_BASE ?= /tmp/$(USER)
-ox_hugo_tmp_dir ?= $(OX_HUGO_TMP_DIR_BASE)/ox-hugo-dev
+OX_ASTRO_TMP_DIR_BASE ?= /tmp/$(USER)
+ox_astro_tmp_dir ?= $(OX_ASTRO_TMP_DIR_BASE)/ox-astro-dev
 
 ifdef INSIDE_EMACS
 	EMACS := $(shell which emacs)
@@ -17,61 +16,20 @@ else
 	EMACS ?= emacs
 endif
 
-# In Netlify, set HUGO env var to "/tmp/me/ox-hugo-dev/hugo/hugo" to
-# use the hugo binary installed by this Makefile.
-HUGO ?= hugo
-HUGO_exists := $(shell command -v $(HUGO) 2> /dev/null)
-ifeq ("$(HUGO_exists)","")
-	HUGO := $(ox_hugo_tmp_dir)/hugo/hugo
-endif
-
-HTMLTEST ?= htmltest
-HTMLTEST_exists := $(shell command -v $(HTMLTEST) 2> /dev/null)
-ifeq ("$(HTMLTEST_exists)","")
-	HTMLTEST := $(ox_hugo_tmp_dir)/htmltest/bin/htmltest
-endif
-
-PANDOC ?= pandoc
-PANDOC_exists := $(shell command -v $(PANDOC) 2> /dev/null)
-ifeq ("$(PANDOC_exists)","")
-	PANDOC := $(ox_hugo_tmp_dir)/pandoc/bin/pandoc
-endif
-
-HUGO_VERSION ?= 0.98.0
-HUGO_ARCHIVE_NAME ?= hugo_$(HUGO_VERSION)_Linux-64bit.tar.gz
-HUGO_BIN_SOURCE ?= https://github.com/gohugoio/hugo/releases/download/v$(HUGO_VERSION)
-
-PANDOC_BIN_VERSION ?= 2.16.2
-PANDOC_ARCHIVE_NAME ?= pandoc-$(PANDOC_BIN_VERSION)-linux-amd64.tar.gz
-PANDOC_BIN_SOURCE ?= https://github.com/jgm/pandoc/releases/download/$(PANDOC_BIN_VERSION)
-
-# baseURL value set via environment variable HUGO_BASEURL
-HUGO_BASEURL ?= http://localhost
-
-# Directory containing the Hugo site's config.toml
-HUGO_BASE_DIR=./
-# Other hugo arguments
-HUGO_ARGS=
-
-# Port for hugo server
-PORT=1337
-
 # Below is set to 1 during "make test"
 TEST_ENABLED=0
 
-# ox-hugo test directory; also contains the setup-ox-hugo.el
-OX_HUGO_TEST_DIR=$(shell pwd)/test
+# ox-astro test directory; also contains the setup-ox-astro.el
+OX_ASTRO_TEST_DIR=$(shell pwd)/test
 
-# Base directory for the Hugo example site
-OX_HUGO_TEST_SITE_DIR=$(OX_HUGO_TEST_DIR)/site
+# Base directory for the Astro example site
+OX_ASTRO_TEST_SITE_DIR=$(OX_ASTRO_TEST_DIR)/site
 
 # Directory containing Org files for the test site
-OX_HUGO_TEST_ORG_DIR=$(OX_HUGO_TEST_SITE_DIR)/content-org
+OX_ASTRO_TEST_ORG_DIR=$(OX_ASTRO_TEST_SITE_DIR)/content-org
+
 # https://stackoverflow.com/a/3774731/1219634
-# Note that the use of immediate assignment := rather than recursive
-# assignment = is important here: you do not want to be running the
-# shell escape every time SOURCES is inspected by make.
-test_org_files := $(shell find ${OX_HUGO_TEST_ORG_DIR} -type f -name '*.org')
+test_org_files := $(shell find ${OX_ASTRO_TEST_ORG_DIR} -type f -name '*.org')
 
 # Path to the Org file (relative to pwd, or absolute)
 ORG_FILE=
@@ -85,130 +43,76 @@ TEST_MATCH ?=
 test_check=1
 
 .PHONY: help emacs-batch md1 \
-	vcheck_emacs vcheck_hugo vcheck_pandoc vcheck \
-	hugo hugo_doc hugo_test serve server diff \
-	test md ert testmkgold \
+	vcheck_emacs vcheck \
+	ert test testmkgold \
 	do_test $(test_org_files) \
-	changelog doc_md doc_gh doc doc_htmltest doc_test \
-	ctemp diffgolden clean cleandocs
+	doc_md doc_gh doc \
+	ctemp diffgolden clean
 
 help:
-	@echo "Help for command-line Org->Markdown for Hugo Exporter"
-	@echo "====================================================="
-	@echo " make -j1 test      <-- Run test with checks enabled"
-	@echo " make md            <-- Only export the test Org files to Markdown, no checks"
-	@echo " make doc           <-- Build both Doc Site contents and GitHub docs"
-	@echo " make FOO.org       <-- Export the FOO.org file from content-org/ dir to Markdown file(s)"
-	@echo " make vcheck        <-- Print Emacs, Org and Pandoc versions"
-	@echo " make hugo          <-- Run hugo"
-	@echo " make serve         <-- Run the hugo server on http://localhost:$(PORT)"
-	@echo " make diff          <-- Run git diff"
-	@echo " make doc_md        <-- Build the Markdown content for the documentation site"
-	@echo " make hugo_doc      <-- Build the documentation site using Hugo"
-	@echo " make changelog     <-- Update CHANGELOG.org"
-	@echo " make doc_gh        <-- Build README.org and CONTRIBUTING.org for GitHub"
-	@echo " make hugo_test     <-- Build the test site using Hugo"
-	@echo " make clean         <-- Delete the Hugo public/ directory and auto-installed elisp packages"
-	@echo " make cleandocs     <-- Delete the Markdown files in doc/content/"
-	@echo " make               <-- Show this help"
+	@echo "Help for ox-astro test runner"
+	@echo "=============================="
+	@echo " make test           <-- Run ERT tests + golden file diff"
+	@echo " make ert            <-- Run only ERT tests"
+	@echo " make md             <-- Re-export test Org files to Markdown (no check)"
+	@echo " make testmkgold     <-- Rebuild test/site/content-golden from current content"
+	@echo " make FOO.org        <-- Export FOO.org to Markdown"
+	@echo " make vcheck         <-- Print Emacs and Org versions"
+	@echo " make doc            <-- Build doc/content from doc/ox-astro-manual.org"
+	@echo " make clean          <-- Delete tmp dir and content-golden"
+	@echo " make                <-- Show this help"
 
-# Note: The Org file from $(ORG_FILE) is loaded *after* the --eval
-# section gets evaluated i.e. --eval '(progn ..)' $(ORG_FILE) If the
-# order is reversed i.e. i.e.$(ORG_FILE) --eval '(progn ..)', the act
-# of loading the $(ORG_FILE) file first will load the older Org
-# version that ships with Emacs and then run the stuff in --eval that
-# loads the new Org version.. and thus we'll end up with mixed Org in
-# the load-path.
+# Note: the Org file from $(ORG_FILE) is loaded *after* the --eval
+# block so the newer Org version is already in the load-path when
+# the file is opened.
 emacs-batch:
 	@echo ""
 	@echo "$(ORG_FILE) ::"
 	@env HOME=$(shell pwd)/test $(EMACS) --batch --eval "(progn\
-	(setenv \"OX_HUGO_TMP_DIR\" \"$(ox_hugo_tmp_dir)\")\
-	(setenv \"TEST_ENABLED\" \"$(TEST_ENABLED)\")\
-	(load-file (expand-file-name \"setup-ox-hugo.el\" \"$(OX_HUGO_TEST_DIR)\"))\
-	)" $(ORG_FILE) \
+(setenv \"OX_ASTRO_TMP_DIR\" \"$(ox_astro_tmp_dir)\")\
+(setenv \"TEST_ENABLED\" \"$(TEST_ENABLED)\")\
+(load-file (expand-file-name \"setup-ox-astro.el\" \"$(OX_ASTRO_TEST_DIR)\"))\
+)" $(ORG_FILE) \
 	-f $(FUNC) \
 	--kill
 
 md1:
-	@$(MAKE_) emacs-batch FUNC=org-hugo-export-all-wim-to-md
+	@$(MAKE_) emacs-batch FUNC=org-astro-export-all-wim-to-md
 
 vcheck_emacs:
-	@mkdir -p $(ox_hugo_tmp_dir)
+	@mkdir -p $(ox_astro_tmp_dir)
 	@$(EMACS) --batch --eval "(progn\
-	(setenv \"OX_HUGO_TMP_DIR\" \"$(ox_hugo_tmp_dir)\")\
-	(load-file (expand-file-name \"setup-ox-hugo.el\" \"$(OX_HUGO_TEST_DIR)\"))\
-	(print-emacs-org-versions)\
-	)" \
+(setenv \"OX_ASTRO_TMP_DIR\" \"$(ox_astro_tmp_dir)\")\
+(load-file (expand-file-name \"setup-ox-astro.el\" \"$(OX_ASTRO_TEST_DIR)\"))\
+(print-emacs-org-versions)\
+)" \
 	--kill
 
-vcheck_hugo:
-	@mkdir -p $(ox_hugo_tmp_dir)
-ifeq ("$(HUGO_exists)","")
-	@find $(ox_hugo_tmp_dir) -maxdepth 1 -type d -name hugo -exec rm -rf "{}" \;
-	@$(CURL) -O $(HUGO_BIN_SOURCE)/$(HUGO_ARCHIVE_NAME)
-	@mkdir -p $(ox_hugo_tmp_dir)/hugo
-	@tar xf $(HUGO_ARCHIVE_NAME) -C $(ox_hugo_tmp_dir)/hugo
-endif
-	@echo ""
-	@echo ":: Version Check :: Hugo ::"
-	@$(HUGO) version
-
-vcheck_pandoc:
-	@mkdir -p $(ox_hugo_tmp_dir)
-ifeq ("$(PANDOC_exists)","")
-	@mkdir -p $(ox_hugo_tmp_dir)/pandoc
-	@find $(ox_hugo_tmp_dir)/pandoc -maxdepth 1 -type d -name bin -exec rm -rf "{}" \;
-	@$(CURL) -O $(PANDOC_BIN_SOURCE)/$(PANDOC_ARCHIVE_NAME)
-	@tar xf $(PANDOC_ARCHIVE_NAME)
-	@mv pandoc-$(PANDOC_BIN_VERSION)/bin $(ox_hugo_tmp_dir)/pandoc/.
-	@rm -rf pandoc-$(PANDOC_BIN_VERSION)
-endif
-	@echo ""
-	@echo ":: Version Check :: Pandoc ::"
-	@$(PANDOC) --version
-
-vcheck: vcheck_emacs vcheck_hugo vcheck_pandoc
-
-hugo: vcheck_hugo
-	@cd $(HUGO_BASE_DIR) && $(HUGO) $(HUGO_ARGS)
-
-hugo_doc:
-	@$(MAKE_) hugo HUGO_BASE_DIR=./doc HUGO_BASEURL=https://ox-hugo.scripter.co/
-
-hugo_test:
-	@$(MAKE_) hugo HUGO_BASE_DIR=./test/site HUGO_BASEURL=https://ox-hugo.scripter.co/test/ HUGO_ARGS=--buildDrafts
-
-serve server: vcheck_hugo
-	@echo "Serving the site on $(HUGO_BASEURL):$(PORT) .."
-	@cd $(HUGO_BASE_DIR) && $(HUGO) server --port $(PORT) --buildDrafts --buildFuture --navigateToChanged
-
-diff:
-	@git diff
+vcheck: vcheck_emacs
 
 ert:
 	$(EMACS) --batch \
 	         --eval "(progn\
-	(setenv \"OX_HUGO_TMP_DIR\" \"$(ox_hugo_tmp_dir)\")\
-	(load-file (expand-file-name \"setup-ox-hugo.el\" \"$(OX_HUGO_TEST_DIR)\"))\
+(setenv \"OX_ASTRO_TMP_DIR\" \"$(ox_astro_tmp_dir)\")\
+(load-file (expand-file-name \"setup-ox-astro.el\" \"$(OX_ASTRO_TEST_DIR)\"))\
     )" \
-	         -L . -L $(OX_HUGO_TEST_DIR)/ert/ \
-	         -l all_tests.el \
+	         -L . -L $(OX_ASTRO_TEST_DIR)/ert/ \
+	         -l all-tests.el \
 	         --eval "(ert-run-tests-batch-and-exit \"$(TEST_MATCH)\")"
 
-test: vcheck_emacs vcheck_pandoc ert testmkgold do_test
+test: vcheck_emacs ert testmkgold do_test
 
-md: vcheck_emacs vcheck_pandoc
+md: vcheck_emacs
 	@$(MAKE_) do_test test_check=0
 
-# Get rid of all changes in $(OX_HUGO_TEST_SITE_DIR)/content.
+# Regenerate the golden output from the current content directory.
 # https://stackoverflow.com/a/16589534/1219634
 testmkgold:
-	@git checkout --ignore-skip-worktree-bits -- $(OX_HUGO_TEST_SITE_DIR)/content
-	@rm -rf $(OX_HUGO_TEST_SITE_DIR)/content-golden
-	@cp -rf $(OX_HUGO_TEST_SITE_DIR)/content $(OX_HUGO_TEST_SITE_DIR)/content-golden
+	@git checkout --ignore-skip-worktree-bits -- $(OX_ASTRO_TEST_SITE_DIR)/content
+	@rm -rf $(OX_ASTRO_TEST_SITE_DIR)/content-golden
+	@cp -rf $(OX_ASTRO_TEST_SITE_DIR)/content $(OX_ASTRO_TEST_SITE_DIR)/content-golden
 
-# Run the md1 + diffgolden rules in loop on all of $(test_org_files)
+# Run md1 + diffgolden over all $(test_org_files).
 # https://stackoverflow.com/a/37748952/1219634
 do_test: $(test_org_files)
 $(test_org_files):
@@ -218,55 +122,36 @@ ifeq ($(test_check),1)
 endif
 
 doc_md:
-	@echo "[Doc Site] Generating ox-hugo Documentation Site content .."
-	@$(MAKE_) md1 ORG_FILE=./doc/ox-hugo-manual.org
+	@echo "[Doc Site] Generating ox-astro Documentation Site content .."
+	@$(MAKE_) md1 ORG_FILE=./doc/ox-astro-manual.org
 	@echo "[Doc Site] Done"
 
 doc_gh:
 	@echo "[GitHub Docs] Generating README.org and CONTRIBUTING.org for GitHub .."
-	@$(MAKE_) emacs-batch FUNC=ox-hugo-export-gh-doc ORG_FILE=./doc/github-files.org
+	@$(MAKE_) emacs-batch FUNC=ox-astro-export-gh-doc ORG_FILE=./doc/github-files.org
 	@echo "[GitHub Docs] Done"
 
 # Requires https://github.com/orhun/git-cliff to be installed.
 changelog:
 	git cliff -c ./doc/cliff.toml > ./CHANGELOG.org
 
-doc: vcheck_emacs doc_md hugo_doc doc_gh
-
-doc_htmltest:
-ifeq ("$(HTMLTEST_exists)","")
-	@mkdir -p $(ox_hugo_tmp_dir)/htmltest
-	@find $(ox_hugo_tmp_dir)/htmltest -maxdepth 1 -type d -name bin -exec rm -rf "{}" \;
-	@git clone $(HUGO_BIN_SOURCE) $(ox_hugo_tmp_dir)/htmltest/bin
-	@tar xf $(ox_hugo_tmp_dir)/htmltest/bin/htmltest_DEV-Linux-64bit.tar.xz -C $(ox_hugo_tmp_dir)/htmltest/bin
-endif
-	@cd doc && $(HTMLTEST)
-doc_test: doc doc_htmltest
+doc: vcheck_emacs doc_md doc_gh
 
 ctemp:
-	@find $(OX_HUGO_TEST_SITE_DIR)/content -name "*.*~" -delete
+	@find $(OX_ASTRO_TEST_SITE_DIR)/content -name "*.*~" -delete
 	@find ./doc/content -name "*.*~" -delete
 
-# Get rid of all changes in $(OX_HUGO_TEST_SITE_DIR)/content after
-# making a copy to $(OX_HUGO_TEST_SITE_DIR)/content-modified.
+# Get rid of all changes in $(OX_ASTRO_TEST_SITE_DIR)/content after
+# making a copy to $(OX_ASTRO_TEST_SITE_DIR)/content-modified.
 # https://stackoverflow.com/a/16589534/1219634
 diffgolden:
-	@rm -rf $(OX_HUGO_TEST_SITE_DIR)/content-modified
-	@cp -rf $(OX_HUGO_TEST_SITE_DIR)/content $(OX_HUGO_TEST_SITE_DIR)/content-modified
-	@git checkout --ignore-skip-worktree-bits -- $(OX_HUGO_TEST_SITE_DIR)/content
-	@diff -r $(OX_HUGO_TEST_SITE_DIR)/content-modified $(OX_HUGO_TEST_SITE_DIR)/content-golden
+	@rm -rf $(OX_ASTRO_TEST_SITE_DIR)/content-modified
+	@cp -rf $(OX_ASTRO_TEST_SITE_DIR)/content $(OX_ASTRO_TEST_SITE_DIR)/content-modified
+	@git checkout --ignore-skip-worktree-bits -- $(OX_ASTRO_TEST_SITE_DIR)/content
+	@diff -r $(OX_ASTRO_TEST_SITE_DIR)/content-modified $(OX_ASTRO_TEST_SITE_DIR)/content-golden
 
 clean: ctemp
-	find $(OX_HUGO_TMP_DIR_BASE)  -maxdepth 1 -type d -name ox-hugo-dev -exec rm -rf "{}" \;
-	find $(OX_HUGO_TEST_SITE_DIR) -maxdepth 1 -type d \( -name public -o -name content-golden -o -name content-modified \) -exec rm -rf "{}" \;
+	find $(OX_ASTRO_TMP_DIR_BASE) -maxdepth 1 -type d -name ox-astro-dev -exec rm -rf "{}" \;
+	find $(OX_ASTRO_TEST_SITE_DIR) -maxdepth 1 -type d \( -name public -o -name content-golden -o -name content-modified \) -exec rm -rf "{}" \;
 	find ./doc -maxdepth 1 -type d -name public -exec rm -rf "{}" \;
-	rm -f ox-hugo-autoloads.el
-
-cleandocs:
-	find ./doc/content -name "*.md" -delete
-
-# Set a make variable during rule execution
-# https://stackoverflow.com/a/1909390/1219634
-
-# Check if an executable exists
-# https://stackoverflow.com/a/34756868/1219634
+	rm -f ox-astro-autoloads.el

@@ -1,7 +1,7 @@
 ;;; org-test-lib.el --- Library of functions and macros needed for running the tests          -*- lexical-binding: t; -*-
 
 ;; Authors: Kaushal Modi <kaushal.modi@gmail.com>
-;; URL: https://ox-hugo.scripter.co
+;; URL: https://ox-astro.scripter.co
 
 ;; This file is not part of GNU Emacs.
 
@@ -55,8 +55,8 @@ variable, and communication channel under `info'."
      (org-export--delete-comment-trees)
      (let* ((tree (org-element-parse-buffer))
             (info (org-combine-plists
-                   (org-export--get-export-attributes 'hugo)
-                   (org-export-get-environment 'hugo))))
+                   (org-export--get-export-attributes 'astro)
+                   (org-export-get-environment 'astro))))
        (org-export--prune-tree tree info)
        (org-export--remove-uninterpreted-data tree info)
        (let ((info (org-combine-plists
@@ -64,4 +64,4 @@ variable, and communication channel under `info'."
          ,@body))))
 
 
-(provide 'org-test-lib)
+(provide 'org-test-lib-astro)
