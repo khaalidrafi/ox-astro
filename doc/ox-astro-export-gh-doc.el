@@ -1,14 +1,14 @@
 ;; Export Org document to GitHub documents like README.org,
 ;; CONTRIBUTING.org.
 
-(defvar ox-hugo-git-root (progn
+(defvar ox-astro-git-root (progn
                            (require 'vc-git)
                            (file-truename (vc-git-root default-directory))))
 
-(defun ox-hugo-export-gh-doc ()
-  "Export `ox-hugo' Org documentation to documentation on GitHub repo."
+(defun ox-astro-export-gh-doc ()
+  "Export `ox-astro' Org documentation to documentation on GitHub repo."
   (interactive)
-  (let* ((ox-hugo-doc-dir (concat ox-hugo-git-root "doc/"))
+  (let* ((ox-astro-doc-dir (concat ox-astro-git-root "doc/"))
          (org-src-preserve-indentation t) ;Preserve the leading whitespace in src blocks
          (org-id-track-globally nil) ;Prevent "Could not read org-id-values .." error
          (org-export-with-sub-superscripts '{})
@@ -30,14 +30,14 @@
          ((or (string= "readme" tag)
               (string= "contributing" tag))
           (dolist (exported-file exported-file-list)
-            (rename-file (expand-file-name exported-file ox-hugo-doc-dir)
-                         (expand-file-name exported-file ox-hugo-git-root)
+            (rename-file (expand-file-name exported-file ox-astro-doc-dir)
+                         (expand-file-name exported-file ox-astro-git-root)
                          :ok-if-already-exists)))
          (t
           nil))))
     ;; Generate TOC in README.org using the `toc-org' package.
     (let ((readme-buf (get-buffer "README.org"))
-          (readme-file (expand-file-name "README.org" ox-hugo-git-root)))
+          (readme-file (expand-file-name "README.org" ox-astro-git-root)))
       (when readme-buf    ;Close README.org if it's already open
         (kill-buffer readme-buf))
       ;; Open the README.org file afresh.
@@ -51,4 +51,4 @@
         (save-buffer)))))
 
 
-(provide 'ox-hugo-export-gh-doc)
+(provide 'ox-astro-export-gh-doc)

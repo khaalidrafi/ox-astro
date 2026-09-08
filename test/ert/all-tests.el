@@ -1,7 +1,7 @@
-;;; all_tests.el --- Tests for ox-hugo.el                   -*- lexical-binding: t; -*-
+;;; all_tests.el --- Tests for ox-astro.el                   -*- lexical-binding: t; -*-
 
 ;; Authors: Kaushal Modi <kaushal.modi@gmail.com>
-;; URL: https://ox-hugo.scripter.co
+;; URL: https://ox-astro.scripter.co
 
 ;; This file is not part of GNU Emacs.
 
@@ -22,7 +22,7 @@
 
 (setq load-prefer-newer t)
 
-;; (require 't1)
-(require 'tanchor)
-(require 'tslug)
-(require 'telement)
+;; (require 't1-astro)
+(require 'tanchor-astro)
+(require 'tslug-astro)
+(require 'telement-astro)

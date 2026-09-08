@@ -1,7 +1,7 @@
 ;;; tslug.el --- Tests related to slug string derivation           -*- lexical-binding: t; -*-
 
 ;; Authors: Kaushal Modi <kaushal.modi@gmail.com>
-;; URL: https://ox-hugo.scripter.co
+;; URL: https://ox-astro.scripter.co
 
 ;; This file is not part of GNU Emacs.
 
@@ -20,8 +20,8 @@
 
 ;;; Code:
 
-(require 'org-test-lib)
-(require 'ox-hugo)
+(require 'org-test-lib-astro)
+(require 'ox-astro)
 
 (ert-deftest test-slug/return-nil ()
   "Test nil return conditions."
@@ -32,7 +32,7 @@
           (org-test-with-parsed-data
               "* <point>"
             (let ((el (org-element-at-point)))
-              (org-hugo--heading-get-slug el info)))))
+              (org-astro--heading-get-slug el info)))))
 
   ;; Heading with EXPORT_FILE_NAME.
   (should
@@ -40,37 +40,37 @@
           (org-test-with-parsed-data
               "* Some Heading<point>"
             (let ((el (org-element-at-point)))
-              (org-hugo--heading-get-slug el info))))))
+              (org-astro--heading-get-slug el info))))))
 
-(ert-deftest test-slug/ignore-hugo-slug ()
-  "Test that EXPORT_HUGO_SLUG is not used to derive the slug."
-  ;; EXPORT_FILE_NAME + EXPORT_HUGO_SLUG
+(ert-deftest test-slug/ignore-astro-slug ()
+  "Test that EXPORT_ASTRO_SLUG is not used to derive the slug."
+  ;; EXPORT_FILE_NAME + EXPORT_ASTRO_SLUG
   (should
    (string= "posts/file"
             (org-test-with-parsed-data
                 "* Some Heading<point>
 :PROPERTIES:
 :EXPORT_FILE_NAME: file
-:EXPORT_HUGO_SLUG: slug
+:EXPORT_ASTRO_SLUG: slug
 :END:"
               (let ((el (org-element-at-point)))
-                (org-hugo--heading-get-slug el info)))))
+                (org-astro--heading-get-slug el info)))))
 
-  ;; EXPORT_FILE_NAME + EXPORT_HUGO_SLUG + EXPORT_HUGO_SECTION
+  ;; EXPORT_FILE_NAME + EXPORT_ASTRO_SLUG + EXPORT_ASTRO_SECTION
   (should
    (string= "section/file"
             (org-test-with-parsed-data
                 "* Section
 :PROPERTIES:
-:EXPORT_HUGO_SECTION: section
+:EXPORT_ASTRO_SECTION: section
 :END:
 ** Some Heading<point>
 :PROPERTIES:
 :EXPORT_FILE_NAME: file
-:EXPORT_HUGO_SLUG: slug
+:EXPORT_ASTRO_SLUG: slug
 :END:"
               (let ((el (nth 1 (org-element-map tree 'headline #'identity info))))
-                (org-hugo--heading-get-slug el info))))))
+                (org-astro--heading-get-slug el info))))))
 
 (ert-deftest test-slug/export-file-name ()
   "Test derivation of the slug from EXPORT_FILE_NAME."
@@ -84,15 +84,15 @@
 :EXPORT_FILE_NAME: file
 :END:"
               (let ((el (org-element-at-point)))
-                (org-hugo--heading-get-slug el info)))))
+                (org-astro--heading-get-slug el info)))))
 
-  ;; EXPORT_FILE_NAME + EXPORT_HUGO_SECTION
+  ;; EXPORT_FILE_NAME + EXPORT_ASTRO_SECTION
   (should
    (string= "section/file"
             (org-test-with-parsed-data
                 "* Section
 :PROPERTIES:
-:EXPORT_HUGO_SECTION: section
+:EXPORT_ASTRO_SECTION: section
 :EXPORT_OPTIONS: toc:t
 :END:
 ** Some Heading<point>
@@ -100,7 +100,7 @@
 :EXPORT_FILE_NAME: file
 :END:"
               (let ((el (nth 1 (org-element-map tree 'headline #'identity info))))
-                (org-hugo--heading-get-slug el info))))))
+                (org-astro--heading-get-slug el info))))))
 
 ;; Leaf bundles
 (ert-deftest test-slug/leaf-bundles ()
@@ -110,11 +110,11 @@
             (org-test-with-parsed-data
                 "* Some Heading<point>
 :PROPERTIES:
-:EXPORT_HUGO_BUNDLE: leaf
+:EXPORT_ASTRO_BUNDLE: leaf
 :EXPORT_FILE_NAME: index
 :END:"
               (let ((el (org-element-at-point)))
-                (org-hugo--heading-get-slug el info)))))
+                (org-astro--heading-get-slug el info)))))
 
   ;; Leaf bundle in a section
   (should
@@ -122,15 +122,15 @@
             (org-test-with-parsed-data
                 "* Section
 :PROPERTIES:
-:EXPORT_HUGO_SECTION: section
+:EXPORT_ASTRO_SECTION: section
 :END:
 ** Some Heading<point>
 :PROPERTIES:
-:EXPORT_HUGO_BUNDLE: leaf
+:EXPORT_ASTRO_BUNDLE: leaf
 :EXPORT_FILE_NAME: index
 :END:"
               (let ((el (nth 1 (org-element-map tree 'headline #'identity info))))
-                (org-hugo--heading-get-slug el info))))))
+                (org-astro--heading-get-slug el info))))))
 
 ;; Branch bundles
 (ert-deftest test-slug/branch-bundles ()
@@ -139,26 +139,26 @@
             (org-test-with-parsed-data
                 "* Some Heading<point>
 :PROPERTIES:
-:EXPORT_HUGO_BUNDLE: branch
+:EXPORT_ASTRO_BUNDLE: branch
 :EXPORT_FILE_NAME: _index
 :END:"
               (let ((el (org-element-at-point)))
-                (org-hugo--heading-get-slug el info)))))
+                (org-astro--heading-get-slug el info)))))
 
-  ;; Inherit :EXPORT_HUGO_BUNDLE
+  ;; Inherit :EXPORT_ASTRO_BUNDLE
   (should
    (string= "posts/branch"
             (org-test-with-parsed-data
                 "* Branch bundle
 :PROPERTIES:
-:EXPORT_HUGO_BUNDLE: branch
+:EXPORT_ASTRO_BUNDLE: branch
 :END:
 ** Landing page<point>
 :PROPERTIES:
 :EXPORT_FILE_NAME: _index
 :END:"
               (let ((el (nth 1 (org-element-map tree 'headline #'identity info))))
-                (org-hugo--heading-get-slug el info)))))
+                (org-astro--heading-get-slug el info)))))
 
   ;; Page in branch bundle, inheritance
   (should
@@ -166,14 +166,14 @@
             (org-test-with-parsed-data
                 "* Branch bundle
 :PROPERTIES:
-:EXPORT_HUGO_BUNDLE: branch
+:EXPORT_ASTRO_BUNDLE: branch
 :END:
 ** Branch page<point>
 :PROPERTIES:
 :EXPORT_FILE_NAME: branch-page
 :END:"
               (let ((el (nth 1 (org-element-map tree 'headline #'identity info))))
-                (org-hugo--heading-get-slug el info)))))
+                (org-astro--heading-get-slug el info)))))
 
   ;; Branch bundle in a section
   (should
@@ -181,18 +181,18 @@
             (org-test-with-parsed-data
                 "* Section
 :PROPERTIES:
-:EXPORT_HUGO_SECTION: section
+:EXPORT_ASTRO_SECTION: section
 :END:
 ** Branch bundle
 :PROPERTIES:
-:EXPORT_HUGO_BUNDLE: branch
+:EXPORT_ASTRO_BUNDLE: branch
 :END:
 *** Some Heading<point>
 :PROPERTIES:
 :EXPORT_FILE_NAME: _index
 :END:"
               (let ((el (nth 2 (org-element-map tree 'headline #'identity info))))
-                (org-hugo--heading-get-slug el info)))))
+                (org-astro--heading-get-slug el info)))))
 
   ;; Branch page in a branch bundle in a section
   (should
@@ -200,18 +200,18 @@
             (org-test-with-parsed-data
                 "* Section
 :PROPERTIES:
-:EXPORT_HUGO_SECTION: section
+:EXPORT_ASTRO_SECTION: section
 :END:
 ** Branch bundle
 :PROPERTIES:
-:EXPORT_HUGO_BUNDLE: branch
+:EXPORT_ASTRO_BUNDLE: branch
 :END:
 *** Some Heading<point>
 :PROPERTIES:
 :EXPORT_FILE_NAME: branch-page
 :END:"
               (let ((el (nth 2 (org-element-map tree 'headline #'identity info))))
-                (org-hugo--heading-get-slug el info))))))
+                (org-astro--heading-get-slug el info))))))
 
 ;; Section
 (ert-deftest test-slug/section ()
@@ -220,13 +220,13 @@
   (should
    (string= "section/file"
             (org-test-with-parsed-data
-                "#+hugo_section: section
+                "#+astro_section: section
 * Some Heading<point>
 :PROPERTIES:
 :EXPORT_FILE_NAME: file
 :END:"
               (let ((el (org-element-at-point)))
-                (org-hugo--heading-get-slug el info))))))
+                (org-astro--heading-get-slug el info))))))
 
 ;; Section fragments
 (ert-deftest test-slug/section-fragments ()
@@ -236,22 +236,22 @@
             (org-test-with-parsed-data
                 "* Section
 :PROPERTIES:
-:EXPORT_HUGO_SECTION: section
+:EXPORT_ASTRO_SECTION: section
 :END:
 ** Section 2
 :PROPERTIES:
-:EXPORT_HUGO_SECTION_FRAG: sec2
+:EXPORT_ASTRO_SECTION_FRAG: sec2
 :END:
 *** Section 3
 :PROPERTIES:
-:EXPORT_HUGO_SECTION_FRAG: sec3
+:EXPORT_ASTRO_SECTION_FRAG: sec3
 :END:
 **** Some page<point>
 :PROPERTIES:
 :EXPORT_FILE_NAME: file
 :END:"
               (let ((el (nth 3 (org-element-map tree 'headline #'identity info))))
-                (org-hugo--heading-get-slug el info)))))
+                (org-astro--heading-get-slug el info)))))
 
   ;; Branch page in a branch bundle in section fragments.
   (should
@@ -259,30 +259,30 @@
             (org-test-with-parsed-data
                 "* Section
 :PROPERTIES:
-:EXPORT_HUGO_SECTION: section
+:EXPORT_ASTRO_SECTION: section
 :END:
 ** Section 2
 :PROPERTIES:
-:EXPORT_HUGO_SECTION_FRAG: sec2
+:EXPORT_ASTRO_SECTION_FRAG: sec2
 :END:
 *** Section 3
 :PROPERTIES:
-:EXPORT_HUGO_SECTION_FRAG: sec3
-:EXPORT_HUGO_BUNDLE: branch
+:EXPORT_ASTRO_SECTION_FRAG: sec3
+:EXPORT_ASTRO_BUNDLE: branch
 :END:
 **** Branch bundle
 :PROPERTIES:
-:EXPORT_HUGO_BUNDLE: branch
+:EXPORT_ASTRO_BUNDLE: branch
 :END:
 ***** Some page<point>
 :PROPERTIES:
 :EXPORT_FILE_NAME: branch-page
 :END:"
               (let ((el (nth 4 (org-element-map tree 'headline #'identity info))))
-                (org-hugo--heading-get-slug el info))))))
+                (org-astro--heading-get-slug el info))))))
 
 
-(provide 'tslug)
+(provide 'tslug-astro)
 
 ;; Note: As of 2022-03-17, Org stable or bugfix version's (9.5.2)
 ;; `org-element-at-point' returns the Org element at point *but*

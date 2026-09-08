@@ -1,7 +1,7 @@
 ;;; tanchor.el --- Tests related to anchor string derivation           -*- lexical-binding: t; -*-
 
 ;; Authors: Kaushal Modi <kaushal.modi@gmail.com>
-;; URL: https://ox-hugo.scripter.co
+;; URL: https://ox-astro.scripter.co
 
 ;; This file is not part of GNU Emacs.
 
@@ -20,32 +20,32 @@
 
 ;;; Code:
 
-(require 'org-test-lib)
-(require 'ox-hugo)
+(require 'org-test-lib-astro)
+(require 'ox-astro)
 
-(ert-deftest test-anchor/org-hugo-get-md5 ()
+(ert-deftest test-anchor/org-astro-get-md5 ()
   "Test md5 based anchor string generation."
   ;; md5 of "abc" heading
   (should
    (string= "900150"
             (org-test-with-parsed-data "* abc<point>"
               (let ((el (org-element-at-point)))
-                (org-hugo-get-md5 el info)))))
+                (org-astro-get-md5 el info)))))
 
   ;; Blank heading
   (should
    (string= "d41d8c"
             (org-test-with-parsed-data "* <point>"
               (let ((el (org-element-at-point)))
-                (org-hugo-get-md5 el info)))))
+                (org-astro-get-md5 el info)))))
 
   ;; No heading
   (should
    (string= "d41d8c"
             (org-test-with-parsed-data "<point>"
               (let ((el (org-element-at-point)))
-                (org-hugo-get-md5 el info)))))
+                (org-astro-get-md5 el info)))))
   )
 
 
-(provide 'tanchor)
+(provide 'tanchor-astro)

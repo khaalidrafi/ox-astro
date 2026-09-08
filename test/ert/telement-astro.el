@@ -1,7 +1,7 @@
-;;; telement.el --- Tests related to Ox-hugo and Org element     -*- lexical-binding: t; -*-
+;;; telement.el --- Tests related to Ox-astro and Org element     -*- lexical-binding: t; -*-
 
 ;; Authors: Kaushal Modi <kaushal.modi@gmail.com>
-;; URL: https://ox-hugo.scripter.co
+;; URL: https://ox-astro.scripter.co
 
 ;; This file is not part of GNU Emacs.
 
@@ -20,8 +20,8 @@
 
 ;;; Code:
 
-(require 'org-test-lib)
-(require 'ox-hugo)
+(require 'org-test-lib-astro)
+(require 'ox-astro)
 
 (ert-deftest test-elem/no-heading ()
   "Test nil return conditions."
@@ -31,7 +31,7 @@
    (equal nil
           (org-test-with-parsed-data
               "* Heading<point>"
-            (org-hugo--get-elem-with-prop :EXPORT_FILE_NAME))))
+            (org-astro--get-elem-with-prop :EXPORT_FILE_NAME))))
 
   ;; Point is at the beginning of the buffer, outside the heading with
   ;; the needed property.
@@ -43,7 +43,7 @@
 :PROPERTIES:
 :EXPORT_FILE_NAME: file
 :END:"
-            (org-hugo--get-elem-with-prop :EXPORT_FILE_NAME))))
+            (org-astro--get-elem-with-prop :EXPORT_FILE_NAME))))
 
   ;; Needed property is in a different heading tree.
   (should
@@ -55,10 +55,10 @@
 :END:
 * Heading 2
 <point>"
-            (org-hugo--get-elem-with-prop :EXPORT_FILE_NAME)))))
+            (org-astro--get-elem-with-prop :EXPORT_FILE_NAME)))))
 
 (ert-deftest test-elem/export-file-name ()
-  "Test finding of Hugo post subtree element."
+  "Test finding of Astro post subtree element."
 
   ;; Point at the very beginning of a heading with the needed
   ;; property.
@@ -74,7 +74,7 @@
 :EXPORT_FILE_NAME: file2
 :END:
 "
-              (cdr (org-hugo--get-elem-with-prop :EXPORT_FILE_NAME)))))
+              (cdr (org-astro--get-elem-with-prop :EXPORT_FILE_NAME)))))
 
   ;; Point in a nested heading under a heading with the needed
   ;; property.
@@ -88,28 +88,28 @@
 ** Heading 1.1
 *** Heading 1.1.1
 <point>"
-              (cdr (org-hugo--get-elem-with-prop :EXPORT_FILE_NAME))))))
+              (cdr (org-astro--get-elem-with-prop :EXPORT_FILE_NAME))))))
 
 
 (ert-deftest test-elem/export-hugo-section ()
-  "Test finding the Hugo section."
+  "Test finding the Astro section."
 
   ;; The first value seen while traversing up should be used. The way
-  ;; the EXPORT_HUGO_SECTION property is set in the below test doesn't
+  ;; the EXPORT_ASTRO_SECTION property is set in the below test doesn't
   ;; make sense; but it's just a test ..
   (should
    (string= "sec2"
             (org-test-with-parsed-data
                 "* Heading 1
 :PROPERTIES:
-:EXPORT_HUGO_SECTION: sec1
+:EXPORT_ASTRO_SECTION: sec1
 :END:
 ** Heading 1.1
 :PROPERTIES:
-:EXPORT_HUGO_SECTION: sec2
+:EXPORT_ASTRO_SECTION: sec2
 :END:
 <point>"
-              (cdr (org-hugo--get-elem-with-prop :EXPORT_HUGO_SECTION))))))
+              (cdr (org-astro--get-elem-with-prop :EXPORT_ASTRO_SECTION))))))
 
 (ert-deftest test-elem/starting-position ()
   "Test property lookup by specifying the starting position."
@@ -124,7 +124,7 @@
 :PROPERTIES:
 :EXPORT_OPTIONS: toc:t
 :END:"
-            (cdr (org-hugo--get-elem-with-prop :EXPORT_OPTIONS 1)))))
+            (cdr (org-astro--get-elem-with-prop :EXPORT_OPTIONS 1)))))
 
   ;; Here, the needed property *is* found because the starting
   ;; position for search is set correctly, and that overrides the init
@@ -137,7 +137,7 @@
 :PROPERTIES:
 :EXPORT_OPTIONS: toc:t
 :END:"
-              (cdr (org-hugo--get-elem-with-prop :EXPORT_OPTIONS 2))))))
+              (cdr (org-astro--get-elem-with-prop :EXPORT_OPTIONS 2))))))
 
 
-(provide 'telement)
+(provide 'telement-astro)

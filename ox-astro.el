@@ -1838,7 +1838,7 @@ cannot be formatted in Hugo-compatible format."
                                    lastmod-str)))))))
                       ;; Else.. do nothing.
                       (t
-                       nil))
+                       nil))))
     dt-rfc3339))
 
 ;;;; Replace Front-matter Keys
@@ -2273,7 +2273,7 @@ This function updates these properties in INFO: `:logbook-date',
                                  (append (cdr (assoc 'notes (assoc context-key logbook-notes)))
                                          (list (nreverse logbook-entry)))))
                        (plist-put info :logbook logbook-notes))
-                     t)))
+                     t))))
 
       (save-match-data
         (cond
@@ -2284,7 +2284,7 @@ This function updates these properties in INFO: `:logbook-date',
       ;; (message "[org-astro--parse-logbook-entry DBG] logbook derived `date' : %S" (plist-get info :logbook-date))
       ;; (message "[org-astro--parse-logbook-entry DBG] logbook derived `lastmod' : %S" (plist-get info :logbook-lastmod))
       ;; (message "[org-astro--parse-logbook-entry DBG] logbook entry : %S" logbook-entry)
-      nil))
+      nil)))
 
 (defun org-astro-drawer (drawer contents info)
   "Transcode a DRAWER element from Org to appropriate Hugo front-matter.
@@ -4275,7 +4275,7 @@ INFO is a plist used as a communication channel."
                  (headless . ,headless)
                  (creator . ,creator)
                  (locale . ,locale)
-))
+                 (blackfriday . ,blackfriday)))
          (data `,(append data weight-data custom-fm-data
                          (list
                           (cons 'menu menu-alist)
@@ -4348,7 +4348,7 @@ INFO is a plist used as a communication channel."
     (setq data (org-astro--replace-keys-maybe data info))
     (setq ret (org-astro--gen-front-matter data fm-format))
     (setq org-astro--fm-yaml ret)
-    ret)
+    ret))
 
 (defun org-astro--calc-weight ()
   "Calculate the weight for a Hugo post or menu item.
