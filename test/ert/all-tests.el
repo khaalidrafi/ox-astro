@@ -27,3 +27,4 @@
 (require 'tfm-astro)
 (require 'tslug-astro)
 (require 'telement-astro)
+(require 'troam-astro)

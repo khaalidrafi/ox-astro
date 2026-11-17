@@ -157,6 +157,17 @@ This variable is used when exporting all subtrees in a file.")
 (defvar org-astro--fm-yaml nil
   "Variable to store the current post's front-matter string in YAML format.")
 
+(defvar org-astro--roam-table nil
+  "Roam unit table of the buffer being exported, or nil.
+
+Each element is a (ID SLUG TITLE) list describing one export unit
+(a valid post subtree carrying an org-id, or the whole file for
+file-based exports).  `org-astro--before-export-function' fills
+this in before an export and `org-astro--after-1-export-function'
+resets it; `org-astro--roam-table' also computes it on demand when
+a caller like the buffer pre-processor needs it earlier.  When
+nil, the roam helpers compute it using `org-astro--get-roam-table'.")
+
 (defvar org-astro--internal-list-separator "\n"
   "String used to separate elements in list variables.
 
@@ -1449,7 +1460,11 @@ This is an internal function."
   (advice-add 'org-babel-exp-code :around #'org-astro--org-babel-exp-code)
   (advice-add 'org-babel--string-to-number :override #'org-astro--org-babel--string-to-number)
   (advice-add 'org-info-export :override #'org-astro--org-info-export)
-  (advice-add 'org-cite-export-bibliography :around #'org-astro--org-cite-export-bibliography))
+  (advice-add 'org-cite-export-bibliography :around #'org-astro--org-cite-export-bibliography)
+  ;; Cache the Org-roam unit table for the upcoming export; the
+  ;; roamID/roamLinks front-matter fields and the id: link
+  ;; translator read it.
+  (setq org-astro--roam-table (org-astro--get-roam-table)))
 
 (defun org-astro--after-1-export-function (info outfile)
   "Function to be run after exporting one post.
@@ -1470,7 +1485,8 @@ This is an internal function."
   (advice-remove 'org-babel--string-to-number #'org-astro--org-babel--string-to-number)
   (advice-remove 'org-babel-exp-code #'org-astro--org-babel-exp-code)
   (setq org-astro--fm nil)
-  (setq org-astro--fm-yaml nil))
+  (setq org-astro--fm-yaml nil)
+  (setq org-astro--roam-table nil))
 
 (defun org-astro--cleanup ()
   "Function to kill Ox-Hugo opened buffers and reset internal variables.
@@ -1483,7 +1499,11 @@ This is an internal function."
     (kill-buffer buf))
   (setq org-astro--opened-buffers nil)
 
-  (setq org-astro--preprocessed-buffer nil))
+  (setq org-astro--preprocessed-buffer nil)
+  ;; Drop the memoized roam table too: it belongs to the buffer that
+  ;; was just exported, and a stale copy must not leak into the next
+  ;; export.
+  (setq org-astro--roam-table nil))
 
 (defun org-astro--after-all-exports-function ()
   "Function to be run after Ox-Hugo exports all the posts.
@@ -3119,7 +3139,10 @@ and rewrite link paths to make blogging more seamless."
   (let* ((raw-link (org-element-property :raw-link link))
          (raw-path (org-element-property :path link))
          (type (org-element-property :type link))
-         (link-is-url (member type '("http" "https" "ftp" "mailto"))))
+         (link-is-url (member type '("http" "https" "ftp" "mailto")))
+         (roam-slug (and (string= type "id")
+                         (stringp raw-path)
+                         (cadr (assoc raw-path (org-astro--roam-table))))))
     ;; (message "[org-astro-link DBG] raw-path 1: %s" raw-path)
 
     (when (and (stringp raw-path)
@@ -3131,6 +3154,15 @@ and rewrite link paths to make blogging more seamless."
     ;; (message "[org-astro-link DBG] link: %S" link)
     ;; (message "[org-astro-link DBG] link type: %s" type)
     (cond
+     ;; org-roam: an `id:' link to a sibling export unit of this buffer
+     ;; becomes a plain link to that unit's Astro content-collection
+     ;; page (/blog/<slug>/).  Ids outside the roam table (other files,
+     ;; non-post headings) keep Org's own resolution further down.
+     (roam-slug
+      (let ((href (concat "/blog/" roam-slug "/")))
+        (if (org-string-nw-p desc)
+            (format "[%s](%s)" desc href)
+          (format "<%s>" href))))
      ;; Link type is handled by a special function.
      ((org-export-custom-protocol-maybe link desc 'md info))
      ((member type '("custom-id" "id"
@@ -4295,6 +4327,12 @@ INFO is a plist used as a communication channel."
                  ;; `org-astro--parse-draft-state' returns a "true"/
                  ;; "false" string; emit a real YAML/TOML boolean.
                  (draft . ,(string= "true" draft))
+                 ;; org-roam connection graph: the unit's own org-id
+                 ;; and the ids it links to, resolved to sibling
+                 ;; pages' slugs.  Empty/absent values are skipped by
+                 ;; the front-matter generators, like for other keys.
+                 (roamID . ,(org-astro--get-roam-id info))
+                 (roamLinks . ,(org-astro--get-roam-links info))
                  (creator . ,creator)
                  (locale . ,locale)))
          (data `,(append data custom-fm-data))
@@ -4392,6 +4430,26 @@ are \"toml\" (via `tomelr') and \"yaml\" (default)."
     (let ((tomelr-indent-multi-line-strings t))
       (format "+++\n%s\n+++\n" (tomelr-encode data)))))
 
+;;;; Small string helpers (lifted from the ai/cleanroom-v0 donor)
+(defun org-astro--js-literal-escape (s)
+  "Escape S for embedding inside a JS template literal.
+Backslashes, backticks and `${' interpolation sequences are
+escaped, so that arbitrary exported text (an ox-html body in
+particular) can never break out of the literal, and braces in the
+embedded text can never parse as Astro expressions."
+  (setq s (replace-regexp-in-string "\\\\" "\\\\\\\\" s))
+  (setq s (replace-regexp-in-string "`" "\\\\`" s))
+  (setq s (replace-regexp-in-string "\\${" "\\\\${" s))
+  s)
+
+(defun org-astro--yaml-escape (s)
+  "Return S as a double-quoted YAML scalar.
+`\\' and `\"' are escaped, so that values containing YAML special
+characters like `:' or `#' cannot corrupt the front matter."
+  (let ((s (replace-regexp-in-string "\\\\" "\\\\\\\\" s)))
+    (setq s (replace-regexp-in-string "\"" "\\\\\"" s))
+    (format "\"%s\"" s)))
+
 (defun org-astro--yaml-scalar (value)
   "Return VALUE encoded as a YAML scalar string.
 
@@ -4407,11 +4465,7 @@ zod-based schemas coerce the quoted ISO date strings to dates."
    ((listp value) ;e.g. alist stored by custom front matter
     (user-error "Nested value %S not supported here" value))
    (t ;string
-    (concat "\""
-            (replace-regexp-in-string
-             "\"" "\\\\\""
-             (replace-regexp-in-string "\\\\" "\\\\\\\\" value))
-            "\""))))
+    (org-astro--yaml-escape value))))
 
 (defun org-astro--gen-yaml-front-matter (data)
   "Generate Astro front-matter in YAML format, and return that string.
@@ -4452,6 +4506,179 @@ Keys with nil or empty values are skipped."
     (if (string= out "")
         "---\n\n---\n" ;Empty front matter still needs valid fences
       (concat "---\n" (substring out 0 -1) "\n---\n"))))
+
+;;;; Org-roam unit table (absorbed from the ai/cleanroom-v0 donor)
+;; The roam subsystem gives every export unit an identity in the
+;; Astro world: the unit's org-id becomes the `roamID' front-matter
+;; key, the `id:' links it contains are resolved to sibling pages'
+;; slugs in `roamLinks', and `id:' links in the body are translated
+;; to /blog/<slug>/ links (the `roam-slug' branch of `org-astro-link').  An
+;; Astro layout can then render linked mentions and backlinks at
+;; build time, straight from the content collection -- zero client
+;; JS.
+
+(defun org-astro--get-file-level-id ()
+  "Return the ID property of the current buffer's file-level drawer.
+Org-roam file nodes keep their org-id there.  Return nil if there
+is no such ID."
+  (org-with-wide-buffer
+   (goto-char (point-min))
+   (let ((first-heading (save-excursion
+                          (or (and (re-search-forward org-heading-regexp nil :noerror)
+                                   (match-beginning 0))
+                              (point-max)))))
+     (catch 'id
+       (while (re-search-forward "^[ \t]*:PROPERTIES:[ \t]*$" first-heading :noerror)
+         (let ((drawer-end (save-excursion
+                             (and (re-search-forward "^[ \t]*:END:[ \t]*$" first-heading :noerror)
+                                  (match-beginning 0)))))
+           (when drawer-end
+             (when (re-search-forward "^[ \t]*:ID:[ \t]+\\([^ \t\r\n]+\\)" drawer-end :noerror)
+               (throw 'id (match-string-no-properties 1)))
+             (goto-char drawer-end))))
+       nil))))
+
+(defun org-astro--unit-astro-slug-at (pom)
+  "Return the Astro content-collection slug for the post subtree at POM.
+
+This slug names the unit in the roam unit table, in /blog/<slug>/
+link targets and in .astro page file names: the unit's own
+inherited EXPORT_ASTRO_SLUG value when set, else the github-slugger
+slug (`org-astro--slugify', the stateless core of `org-astro-slug')
+of the EXPORT_FILE_NAME base name -- Astro derives content
+collection entry ids from file names exactly that way.  The
+Hugo-style section prefix and page-bundle handling of
+`org-astro--heading-get-slug' are deliberately not part of it: an
+Astro entry id is the slug alone.  Bundle landing pages
+(index/_index) should set EXPORT_ASTRO_SLUG explicitly.
+
+Return nil if the entry at POM is not itself a post subtree (no
+EXPORT_FILE_NAME of its own)."
+  (org-with-point-at pom
+    (let ((file-name (org-entry-get (point) "EXPORT_FILE_NAME")))
+      (when (org-string-nw-p file-name)
+        (or (org-string-nw-p (org-entry-get (point) "EXPORT_ASTRO_SLUG" t))
+            (org-astro--slugify (file-name-base file-name)))))))
+
+(defun org-astro--file-unit-astro-slug ()
+  "Return the Astro content-collection slug for a file-based export.
+The ASTRO_SLUG keyword wins when set; else the Org file's base
+name is passed through `org-astro--slugify'."
+  (or (org-string-nw-p
+       (cadr (assoc "ASTRO_SLUG" (org-collect-keywords '("ASTRO_SLUG")))))
+      (and buffer-file-name
+           (org-astro--slugify (file-name-base buffer-file-name)))))
+
+(defun org-astro--get-roam-table ()
+  "Return the Org-roam unit table of the current buffer.
+
+The table is an alist of (ID SLUG TITLE) elements, one per export
+unit that carries an org-id: a valid post subtree (an EXPORT_FILE_NAME
+property of its own), or -- when the buffer has none of those --
+the whole file (file-based export).  Units without an org-id do
+not join the roam graph and are left out, mirroring org-roam: only
+nodes with ids can be linked with `id:' links."
+  (org-with-wide-buffer
+   (let ((table nil))
+     (if (org-astro--buffer-has-valid-post-subtree-p)
+         (org-map-entries
+          (lambda ()
+            (let ((id (org-entry-get (point) "ID")))
+              (when id
+                (let ((slug (org-astro--unit-astro-slug-at (point))))
+                  (when slug
+                    (push (list id slug (org-entry-get (point) "ITEM")) table))))))
+          "EXPORT_FILE_NAME<>\"\"" 'file)
+       (let ((id (org-astro--get-file-level-id))
+             (slug (org-astro--file-unit-astro-slug)))
+         (when (and id slug)
+           (push (list id slug
+                       (org-string-nw-p
+                        (cadr (assoc "TITLE" (org-collect-keywords '("TITLE"))))))
+                 table))))
+     (nreverse table))))
+
+(defun org-astro--roam-table ()
+  "Return the current buffer's roam unit table, computing it if needed.
+The result is memoized in the `org-astro--roam-table' variable for
+the ongoing export; `org-astro--before-export-function' and
+`org-astro--cleanup' manage that cache."
+  (or org-astro--roam-table
+      (setq org-astro--roam-table (org-astro--get-roam-table))))
+
+(defun org-astro--get-roam-id (info)
+  "Return the org-id of the export unit at hand, or nil.
+
+For subtree-based exports this is the ID property of the post
+subtree itself (not inherited: each org-roam node carries its own
+id); for file-based exports, the ID in the file-level property
+drawer.
+
+INFO is a plist used as a communication channel."
+  (if (org-astro--subtree-export-p info)
+      (org-entry-get (point) "ID")
+    (org-astro--get-file-level-id)))
+
+(defun org-astro--get-roam-links (info)
+  "Return the slugs of the roam units this export unit links to.
+
+Scan the unit being exported (the parse tree from INFO, else the
+narrowed buffer) for `id:' links and resolve each id through
+`org-astro--roam-table'.  Ids that are not exported units of the
+current buffer (other files, headings that are not posts) do not
+join the roam graph.  Document order is kept, duplicates removed.
+
+INFO is a plist used as a communication channel."
+  (let* ((table (org-astro--roam-table))
+         (tree (or (plist-get info :parse-tree)
+                   (org-element-parse-buffer)))
+         links)
+    (org-element-map tree 'link
+      (lambda (link)
+        (when (string= "id" (org-element-property :type link))
+          (let ((slug (cadr (assoc (org-element-property :path link) table))))
+            (when (and slug (not (member slug links)))
+              (setq links (cons slug links)))))))
+    (nreverse links)))
+
+(defun org-astro-export-roam-graph (outfile)
+  "Write this buffer's roam connection graph to OUTFILE as JSON.
+
+Nodes are the buffer's roam units (id, slug, title); edges are the
+`id:' links between them, each emitted as a [from-id, to-id] pair.
+An Astro layout renders backlinks and linked mentions from this
+file at build time, straight from the exported content -- zero
+client JS.  Run it after `org-astro-export-wim-to-md' (or any
+export of the same buffer): the table is recomputed from the
+buffer, so nothing depends on export-time state."
+  (interactive "FWrite roam graph to: ")
+  (let* ((table (org-astro--get-roam-table))
+         (ids (mapcar #'car table))
+         (nodes (mapcar (lambda (u)
+                          `((id . ,(nth 0 u))
+                            (slug . ,(nth 1 u))
+                            (title . ,(nth 2 u))))
+                        table))
+         edges)
+    (when (org-astro--buffer-has-valid-post-subtree-p)
+      (org-map-entries
+       (lambda ()
+         (let ((from-id (org-entry-get (point) "ID")))
+           (when (member from-id ids)
+             (save-restriction
+               (org-narrow-to-subtree)
+               (org-element-map (org-element-parse-buffer) 'link
+                 (lambda (l)
+                   (when (string= "id" (org-element-property :type l))
+                     (let ((to-id (org-element-property :path l)))
+                       (when (and (member to-id ids)
+                                  (not (equal from-id to-id)))
+                         (push (list from-id to-id) edges))))))))))
+       "EXPORT_FILE_NAME<>\"\"" 'file))
+    (let ((json-encoding-pretty-print t))
+      (with-temp-file outfile
+        (insert (json-encode `((nodes . ,nodes)
+                               (edges . ,(delete-dups edges)))))))))
 
 (defun org-astro--selective-property-inheritance ()
   "Return a list of properties that should be inherited."
