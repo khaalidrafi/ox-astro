@@ -1,0 +1,61 @@
+#+title: AI-REVIEW — clean-room v0 lane and the roam/.astro porting plan
+#+date: <2026-11-18>
+
+* What happened on 2026-11-18
+
+Owner order (Discord #hq): "Start working on ox-astro, a fork of ox-hugo
+adapted for AstroJS ... support for org-roam so that blog contents use ID
+links and have roam connections."
+
+The session discovered the REAL fork line first — this branch (ai/main):
+ox-hugo upstream history + the Owner's Steps 1-3 (2026-09-08):
+
+1. e3c8075  Port ox-hugo skeleton to ox-astro
+2. 799addc  Adapt test infrastructure for ox-astro (Step 1b)
+3. 07638e8  Add github-slugger port: org-astro-slug (Step 2)
+4. 5d19172  Rework front matter for Astro: YAML default + Astro keys (Step 3)
+
+The 5,134-line fork ox-astro.el currently carries *zero* org-roam
+references and no .astro component writer (it exports Astro markdown
+front matter only).  The session additionally wrote a clean-room v0
+exporter before finding this branch; it lives on *ai/cleanroom-v0*
+(single commit 357b4a1, ~490 lines) and does NOT belong on the trunk —
+it is a feature donor, not a competing backend.
+
+* What ai/cleanroom-v0 contributes (all absent from this fork)
+
+1. *org-roam subsystem*: per-unit =roamID= (org-id) + =roamLinks=
+   (resolved sibling slugs) front matter; =id:= links translated to
+   =/blog/<slug>/= at export; =roam.json= node/edge graph export
+   (ox-astro-export-roam-graph).
+2. *.astro component writer*: ox-html body embedded via =set:html=,
+   HTML escaped into a JS template literal (braces can never parse as
+   Astro expressions); typed frontmatter object; layout import with
+   per-unit =EXPORT_ASTRO_LAYOUT=.
+3. *Derived markdown backend* (astro-md) with a link translator —
+   the fork's Step-3 front matter rework already covers the YAML side;
+   the translator is the piece the fork lacks.
+4. *Example layout* (examples/layouts/BlogPost.astro) rendering
+   linked mentions + backlinks at build time from the content
+   collection — the "roam connections" deliverable, zero client JS.
+
+* Porting plan (next cuts, onto THIS fork's ox-astro.el)
+
+1. Lift =ox-astro--js-literal-escape=, =ox-astro--yaml-escape=,
+   slug (the fork already owns org-astro-slug — keep that one),
+   and the =roamID=/=roamLinks= front matter fields into the fork's
+   front matter machinery (its Step-3 rework is the right home).
+2. Add the =id:= link translator to the fork's export path.
+3. Port the =.astro= writer as a second export target beside the
+   markdown one.
+4. Adopt the clean-room ERT tests (tests/ox-astro-test.el) into the
+   fork's test/ert/ tree — note the clean-room suite has NOT been run
+   (no Emacs binary in the writing sandbox); the fork's CI workflow
+   is the first lane to prove them.
+5. Then delete ai/cleanroom-v0 with the absorb recorded here.
+
+* Branch law
+
+- ai/main — the fork trunk (this branch).  Docs-only commits land here
+  from the AI lane; code changes ride named ai/ lanes after review.
+- ai/cleanroom-v0 — feature donor for the port above; frozen.
