@@ -59,3 +59,30 @@ it is a feature donor, not a competing backend.
 - ai/main — the fork trunk (this branch).  Docs-only commits land here
   from the AI lane; code changes ride named ai/ lanes after review.
 - ai/cleanroom-v0 — feature donor for the port above; frozen.
+
+* Absorb record (2026-11-18, lane ai/roam-astro-absorb--g_z.ai)
+
+Landed on the trunk through this lane:
+- Step 1: roam unit table (per-unit org-id + slug + title, memoized
+  per export), roamID/roamLinks front-matter fields, the donor's
+  js-literal-escape / yaml-escape helpers (yaml-escape now backs
+  org-astro--yaml-scalar).
+- Step 2: the id: link translator — org-astro-link resolves id:
+  links through the roam table and emits /blog/<slug>/ pages.
+- roam graph export: org-astro-export-roam-graph writes nodes +
+  id-to-id edges as JSON (interactive command; call it after an
+  export — wiring it into the export command's tail is the next
+  cut).
+- Step 4: ERT tests test/ert/troam-astro.el (table, front-matter
+  keys, link translation, graph JSON).  NOT yet run: no Emacs in
+  the writing sandbox; the fork's CI lane is the first to prove
+  them.
+
+Still open from the plan: step 3 (the .astro component writer +
+the example BlogPost.astro layout) and the graph export wiring.
+The donor lane is retired per plan step 5; a local archive tag
+archive/cleanroom-v0 keeps the single commit in the Lead clone.
+
+Review note (Lead): the lane's diff was read in full; the donor's
+table and slug logic was checked against the fork's Step-2 slugger
+and front-matter machinery before the merge.
